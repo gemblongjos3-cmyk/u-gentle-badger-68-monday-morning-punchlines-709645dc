@@ -28,6 +28,11 @@ number.
 
 The program re-derives the pick from the scores: highest combined score
 wins, ties go to the earliest candidate in the list.
+
+v6 adds JUDGES_NOTES (the per-finalist judging notes from the scorecard)
+and stricter validation: the entry must be exactly one line with no
+leading/trailing whitespace, so a stray newline can never slip into the
+submitted text.
 """
 
 import os
@@ -73,6 +78,30 @@ SCORES = {
     "Monday is just Sunday's evil twin with a calendar invite.": 8.25,
 }
 
+# Judging notes per finalist, quoted from the staging scorecard.
+# The winner's note explains the rubric+panel compromise; the other
+# notes explain why each finalist fell short. Scores marked as bounds
+# in SCORES stay bounds here — no panel score is invented.
+JUDGES_NOTES = {
+    "Monday morning: where 'just five more minutes' becomes a career decision.":
+        "WINNER. Rubric #2 (8.9) + panel #1 (9.0), combined 8.95. The "
+        "'five more minutes' premise is the most universal, and the "
+        "escalation to 'career decision' is sharper than #4's custody "
+        "metaphor.",
+    "My bed filed for custody of me on Monday mornings.":
+        "Rubric #1 (9.2) but outside the panel top-3, so its combined "
+        "score is bounded below the winner's 8.95; the custody metaphor "
+        "is more niche.",
+    "I showed up to Monday like a software update nobody asked for.":
+        "Panel #2 (8.5). Fresh tech simile, self-deprecating, concise — "
+        "but the premise is narrower than 'five more minutes'.",
+    "My alarm didn't wake me up; it just filed a complaint with HR.":
+        "Solid HR joke (rubric 8.7); outside the panel top-3.",
+    "Monday is just Sunday's evil twin with a calendar invite.":
+        "Panel #3 (8.0). Economical, corporate twist on a familiar trope; "
+        "the twin premise is less immediate than snoozing.",
+}
+
 
 def score(text: str) -> float:
     """Final combined score (/10) for a candidate."""
@@ -91,6 +120,13 @@ def pick_winner() -> str:
 
 
 def validate(text: str) -> None:
+    # Stricter than the contest minimum: the entry must be exactly one
+    # line, with no leading/trailing whitespace and no line breaks, so
+    # the file we write is exactly the staged winner text.
+    if text != text.strip():
+        raise ValueError("entry must not have leading or trailing whitespace")
+    if "\n" in text or "\r" in text:
+        raise ValueError("entry must be a single line")
     if not (1 <= len(text) <= MAX_CHARS):
         raise ValueError(f"entry must be 1-{MAX_CHARS} characters, got {len(text)}")
     if not text.strip():
@@ -107,6 +143,7 @@ def main() -> None:
     for candidate in sorted(FINALISTS, key=score, reverse=True):
         mark = "  <-- pick" if candidate == winner else ""
         print(f"{score(candidate):>6.2f}  {candidate}{mark}")
+    print(f"judge: {JUDGES_NOTES[winner]}")
 
     os.makedirs("/output", exist_ok=True)
     with open("/output/entry.txt", "w", encoding="utf-8", newline="") as f:
